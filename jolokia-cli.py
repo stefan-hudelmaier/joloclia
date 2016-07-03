@@ -4,6 +4,7 @@ from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.contrib.completers import WordCompleter
 from prompt_toolkit.styles import style_from_dict
 from prompt_toolkit.token import Token
+from collections import defaultdict
 
 from pyjolokia import Jolokia
 
@@ -19,8 +20,9 @@ class MBean:
 
 
 class Attribute:
-    def __init__(self, attribute_name):
+    def __init__(self, attribute_name, attribute_type):
         self.attribute_name = attribute_name
+        self.attribute_type = attribute_type
 
 
 # def get_bottom_toolbar_tokens(cli):
@@ -37,29 +39,24 @@ class TopicCompleter(Completer):
         yield Completion('completion', start_position=0)
 
 
-# def get_topics():
-#    return [topic for topic in
-#            check_output("cd %s && bin/kafka-topics.sh --list --zookeeper 127.0.0.1:2181" % KAFKA_HOME,
-#                         shell=True).split('\n') if topic != ""]
-
-
 # def get_topic_completer():
 #    return WordCompleter(get_topics())
 
 
 def create_attribute(attribute_name, json):
-    print(attribute_name, json)
+    print(json)
+    return Attribute(attribute_name, json['type'])
 
 
 def create_mbean(object_name, json):
     mbean = MBean(object_name=object_name, description=json['desc'])
 
-    print(json)
     if 'attr' in json:
 
         for attribute_name in json['attr'].keys():
-            print(json['attr'][attribute_name])
             mbean.add_attribute(create_attribute(attribute_name, json['attr'][attribute_name]))
+
+    return mbean
 
 
 if __name__ == '__main__':
@@ -70,16 +67,20 @@ if __name__ == '__main__':
     request = j.request(type='list')
     domains = request['value'].keys()
 
+    # Multimap
+    mbeans_by_domain = defaultdict(list)
     mbeans = []
 
     for domain in domains:
         object_names = request['value'][domain].keys()
 
         for object_name in object_names:
-            mbeans.append(create_mbean(object_name, request['value'][domain][object_name]))
+            mbean = create_mbean(object_name, request['value'][domain][object_name])
+            mbeans.append(mbean)
+
+            mbeans_by_domain[domain].append(mbean)
             # print(request['value'][domain])
 
-    #print(domains())
     """
     while True:
 
