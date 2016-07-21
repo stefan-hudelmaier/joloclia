@@ -1,18 +1,21 @@
+from urlparse import urlparse
+
 from prompt_toolkit import prompt
-from subprocess import check_output
-from prompt_toolkit.completion import Completer, Completion
-from prompt_toolkit.contrib.completers import WordCompleter
 from prompt_toolkit.styles import style_from_dict
 from prompt_toolkit.token import Token
 from collections import defaultdict
 
 from pyjolokia import Jolokia
 
+from completer import JolokiaCliCompleter
+
 
 class MBean:
-    def __init__(self, object_name, description):
+    def __init__(self, object_name, domain, description):
+        self.absolute_object_name = "%s:%s" % (domain, object_name)
         self.object_name = object_name
         self.description = description
+        self.domain = domain
         self.attributes = []
 
     def add_attribute(self, attribute):
@@ -34,22 +37,17 @@ style = style_from_dict({
 })
 
 
-class TopicCompleter(Completer):
-    def get_completions(self, document, complete_event):
-        yield Completion('completion', start_position=0)
-
-
-# def get_topic_completer():
-#    return WordCompleter(get_topics())
+def get_completer(mbeans):
+    return JolokiaCliCompleter(mbeans)
 
 
 def create_attribute(attribute_name, json):
-    print(json)
+    # print(json)
     return Attribute(attribute_name, json['type'])
 
 
-def create_mbean(object_name, json):
-    mbean = MBean(object_name=object_name, description=json['desc'])
+def create_mbean(object_name, domain, json):
+    mbean = MBean(object_name=object_name, domain=domain, description=json['desc'])
 
     if 'attr' in json:
 
@@ -61,7 +59,10 @@ def create_mbean(object_name, json):
 
 if __name__ == '__main__':
 
-    j = Jolokia('http://127.0.0.1:8161/api/jolokia')
+    url_string = 'http://127.0.0.1:8161/api/jolokia'
+    url = urlparse(url_string)
+
+    j = Jolokia(url.geturl())
     j.auth(httpusername='admin', httppassword='admin')
 
     request = j.request(type='list')
@@ -75,17 +76,30 @@ if __name__ == '__main__':
         object_names = request['value'][domain].keys()
 
         for object_name in object_names:
-            mbean = create_mbean(object_name, request['value'][domain][object_name])
+            mbean = create_mbean(object_name, domain, request['value'][domain][object_name])
             mbeans.append(mbean)
 
             mbeans_by_domain[domain].append(mbean)
             # print(request['value'][domain])
 
-    """
     while True:
+        # answer = prompt(u'Choose topic: ', get_bottom_toolbar_tokens=get_bottom_toolbar_tokens,
+        answer = prompt(u'%s%s# ' % (url.netloc, url.path), completer=get_completer(mbeans), style=style)
 
-        answer = prompt(u'Choose topic: ', get_bottom_toolbar_tokens=get_bottom_toolbar_tokens,
-                        completer=get_topic_completer(), style=style)
+        command_with_arguments = answer.split(" ")
 
-        selected_topic = answer
-        """
+        if len(command_with_arguments) == 0:
+            continue
+
+        command = command_with_arguments[0]
+        arguments = command_with_arguments[1:]
+
+        if command == "read":
+            if len(arguments) == 0:
+                print 'Missing argument'
+                continue
+
+            # print "Reading", arguments[0]
+            response = j.request(type='read', mbean=arguments[0], attribute=arguments[1])
+
+            print response['value']

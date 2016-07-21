@@ -1,2 +1,2 @@
-prompt-toolkit
+prompt_toolkit
 pyjolokia
