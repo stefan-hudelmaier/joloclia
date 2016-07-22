@@ -7,7 +7,9 @@ COMMANDS = ["read", "describe"]
 class JolokiaCliCompleter(Completer):
     def __init__(self, mbeans):
         self.mbean_dict = {mbean.absolute_object_name: mbean for mbean in mbeans}
-        self.mbean_completer = WordCompleter([mbean.absolute_object_name for mbean in mbeans])
+
+        self.mbeans_with_attributes_completer = WordCompleter(
+            [mbean.absolute_object_name for mbean in mbeans if len(mbean.attributes) > 0])
 
     def get_completions(self, document, complete_event):
 
@@ -20,7 +22,7 @@ class JolokiaCliCompleter(Completer):
 
             if command in ["read"]:
                 if len(words_before_cursor) == 2:
-                    for completion in self.mbean_completer.get_completions(document, complete_event):
+                    for completion in self.mbeans_with_attributes_completer.get_completions(document, complete_event):
                         yield completion
                 elif len(words_before_cursor) == 3:
                     absolute_object_name = words_before_cursor[1]
